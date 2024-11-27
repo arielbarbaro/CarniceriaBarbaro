@@ -1,158 +1,166 @@
-CREATE DATABASE CarniceriaBarbaro;
+
+-- Creación de la base de datos
+CREATE DATABASE IF NOT EXISTS CarniceriaBarbaro;
 USE CarniceriaBarbaro;
-CREATE TABLE Categoria (
+
+
+-- TABLAS
+
+
+-- Tabla: Categoria
+CREATE TABLE IF NOT EXISTS Categoria (
     id_categoria INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    descripcion TEXT DEFAULT NULL
 );
 
-CREATE TABLE Producto (
+-- Tabla: Producto
+CREATE TABLE IF NOT EXISTS Producto (
     id_producto INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL,
-    precio DECIMAL(10, 2) NOT NULL,
-    stock INT DEFAULT 0,
-    id_categoria INT,
-    FOREIGN KEY (id_categoria) REFERENCES Categoria(id_categoria)
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    precio DECIMAL(10, 2) NOT NULL CHECK (precio > 0),
+    stock INT DEFAULT 0 CHECK (stock >= 0),
+    id_categoria INT NOT NULL,
+    FOREIGN KEY (id_categoria) REFERENCES Categoria(id_categoria) ON DELETE CASCADE
 );
 
-CREATE TABLE Proveedor (
+-- Tabla: Proveedor
+CREATE TABLE IF NOT EXISTS Proveedor (
     id_proveedor INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL,
-    telefono VARCHAR(15),
-    direccion VARCHAR(100)
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    telefono VARCHAR(15) NOT NULL,
+    direccion VARCHAR(100) DEFAULT NULL
 );
 
-CREATE TABLE ProductoProveedor (
-    id_producto INT,
-    id_proveedor INT,
+-- Tabla: ProductoProveedor
+CREATE TABLE IF NOT EXISTS ProductoProveedor (
+    id_producto INT NOT NULL,
+    id_proveedor INT NOT NULL,
     PRIMARY KEY (id_producto, id_proveedor),
-    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
-    FOREIGN KEY (id_proveedor) REFERENCES Proveedor(id_proveedor)
+    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto) ON DELETE CASCADE,
+    FOREIGN KEY (id_proveedor) REFERENCES Proveedor(id_proveedor) ON DELETE CASCADE
 );
 
-CREATE TABLE Cliente (
+-- Tabla: Cliente
+CREATE TABLE IF NOT EXISTS Cliente (
     id_cliente INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(50) NOT NULL,
-    telefono VARCHAR(15),
-    direccion VARCHAR(100)
+    telefono VARCHAR(15) DEFAULT NULL,
+    direccion VARCHAR(100) DEFAULT NULL
 );
 
-CREATE TABLE Venta (
-    id_venta INT PRIMARY KEY AUTO_INCREMENT,
-    id_cliente INT,
-    fecha DATE NOT NULL,
-    total DECIMAL(10, 2),
-    FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente)
-);
 
-CREATE TABLE DetalleVenta (
-    id_detalle INT PRIMARY KEY AUTO_INCREMENT,
-    id_venta INT,
-    id_producto INT,
-    cantidad INT NOT NULL,
-    precio_unitario DECIMAL(10, 2) NOT NULL,
-    FOREIGN KEY (id_venta) REFERENCES Venta(id_venta),
-    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
-);
+-- VISTAS
 
-CREATE TABLE Empleado (
-    id_empleado INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL,
-    apellido VARCHAR(50) NOT NULL,
-    telefono VARCHAR(15),
-    direccion VARCHAR(100),
-    fecha_contratacion DATE NOT NULL
-);
 
-CREATE TABLE Rol (
-    id_rol INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL
-);
+-- Vista: Productos disponibles por categoría
+CREATE OR REPLACE VIEW ProductosPorCategoria AS
+SELECT 
+    c.nombre AS categoria,
+    p.nombre AS producto,
+    p.precio,
+    p.stock
+FROM Producto p
+JOIN Categoria c ON p.id_categoria = c.id_categoria;
 
-CREATE TABLE EmpleadoRol (
-    id_empleado INT,
-    id_rol INT,
-    fecha_asignacion DATE NOT NULL,
-    PRIMARY KEY (id_empleado, id_rol),
-    FOREIGN KEY (id_empleado) REFERENCES Empleado(id_empleado),
-    FOREIGN KEY (id_rol) REFERENCES Rol(id_rol)
-);
+-- Vista: Relación de productos con proveedores
+CREATE OR REPLACE VIEW ProductosConProveedores AS
+SELECT 
+    p.nombre AS producto,
+    prov.nombre AS proveedor,
+    prov.telefono
+FROM Producto p
+JOIN ProductoProveedor pp ON p.id_producto = pp.id_producto
+JOIN Proveedor prov ON pp.id_proveedor = prov.id_proveedor;
 
-CREATE TABLE Sueldo (
-    id_sueldo INT PRIMARY KEY AUTO_INCREMENT,
-    id_empleado INT,
-    sueldo DECIMAL(10, 2) NOT NULL,
-    fecha_inicio DATE NOT NULL,
-    fecha_fin DATE,
-    FOREIGN KEY (id_empleado) REFERENCES Empleado(id_empleado)
-);
 
-CREATE TABLE Inventario (
-    id_inventario INT PRIMARY KEY AUTO_INCREMENT,
-    id_producto INT,
-    cantidad INT NOT NULL,
-    fecha DATE NOT NULL,
-    tipo_movimiento ENUM('entrada', 'salida') NOT NULL,
-    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
-);
+-- FUNCIONES
 
-CREATE TABLE Compra (
-    id_compra INT PRIMARY KEY AUTO_INCREMENT,
-    id_proveedor INT,
-    fecha DATE NOT NULL,
-    total DECIMAL(10, 2) NOT NULL,
-    FOREIGN KEY (id_proveedor) REFERENCES Proveedor(id_proveedor)
-);
 
-CREATE TABLE DetalleCompra (
-    id_detalle_compra INT PRIMARY KEY AUTO_INCREMENT,
-    id_compra INT,
-    id_producto INT,
-    cantidad INT NOT NULL,
-    precio_unitario DECIMAL(10, 2) NOT NULL,
-    FOREIGN KEY (id_compra) REFERENCES Compra(id_compra),
-    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
-);
+-- Función: Calcular descuento
+DELIMITER $$
+CREATE FUNCTION CalcularDescuento(precio DECIMAL(10, 2), porcentaje DECIMAL(5, 2))
+RETURNS DECIMAL(10, 2)
+DETERMINISTIC
+BEGIN
+    RETURN precio - (precio * porcentaje / 100);
+END $$
+DELIMITER ;
 
-CREATE TABLE HistorialPrecioProducto (
-    id_historial INT PRIMARY KEY AUTO_INCREMENT,
-    id_producto INT,
-    precio_anterior DECIMAL(10, 2),
-    precio_nuevo DECIMAL(10, 2),
-    fecha_cambio DATE NOT NULL,
-    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
-);
 
-CREATE TABLE Turno (
-    id_turno INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL,
-    hora_inicio TIME NOT NULL,
-    hora_fin TIME NOT NULL
-);
 
-CREATE TABLE Asistencia (
-    id_asistencia INT PRIMARY KEY AUTO_INCREMENT,
-    id_empleado INT,
-    id_turno INT,
-    fecha DATE NOT NULL,
-    hora_entrada TIME,
-    hora_salida TIME,
-    FOREIGN KEY (id_empleado) REFERENCES Empleado(id_empleado),
-    FOREIGN KEY (id_turno) REFERENCES Turno(id_turno)
-);
+-- PROCEDIMIENTOS
 
-CREATE TABLE Promocion (
-    id_promocion INT PRIMARY KEY AUTO_INCREMENT,
-    descripcion VARCHAR(100) NOT NULL,
-    descuento DECIMAL(5, 2) NOT NULL,
-    fecha_inicio DATE NOT NULL,
-    fecha_fin DATE NOT NULL
-);
 
-CREATE TABLE ProductoPromocion (
-    id_producto INT,
-    id_promocion INT,
-    PRIMARY KEY (id_producto, id_promocion),
-    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
-    FOREIGN KEY (id_promocion) REFERENCES Promocion(id_promocion)
-);
+-- Procedimiento: Insertar un nuevo cliente
+DELIMITER $$
+CREATE PROCEDURE InsertarCliente(
+    IN nombre_cliente VARCHAR(50),
+    IN telefono_cliente VARCHAR(15),
+    IN direccion_cliente VARCHAR(100)
+)
+BEGIN
+    INSERT INTO Cliente (nombre, telefono, direccion)
+    VALUES (nombre_cliente, telefono_cliente, direccion_cliente);
+END $$
+DELIMITER ;
+
+-- Procedimiento: Registrar una venta (básico)
+DELIMITER $$
+CREATE PROCEDURE RegistrarVenta(
+    IN id_producto INT,
+    IN cantidad INT
+)
+BEGIN
+    DECLARE stock_actual INT;
+    
+    -- Obtener el stock actual del producto
+    SELECT stock INTO stock_actual FROM Producto WHERE id_producto = id_producto;
+
+    -- Verificar si hay suficiente stock
+    IF stock_actual >= cantidad THEN
+        -- Actualizar el stock
+        UPDATE Producto SET stock = stock - cantidad WHERE id_producto = id_producto;
+    ELSE
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Stock insuficiente para realizar la venta.';
+    END IF;
+END $$
+DELIMITER ;
+
+
+-- DATOS DE INSERCIÓN
+
+
+-- Insertar categorías
+INSERT INTO Categoria (nombre, descripcion) VALUES 
+('Carnes Rojas', 'Cortes de carne vacuna y de cerdo'),
+('Carnes Blancas', 'Carne de pollo, pescado y similares'),
+('Embutidos', 'Productos como salchichas, chorizos, etc.');
+
+-- Insertar productos
+INSERT INTO Producto (nombre, precio, stock, id_categoria) VALUES
+('Bife de Chorizo', 1500.00, 20, 1),
+('Pollo Entero', 800.00, 15, 2),
+('Salchicha Viena', 500.00, 30, 3);
+
+-- Insertar proveedores
+INSERT INTO Proveedor (nombre, telefono, direccion) VALUES
+('Proveedor A', '123456789', 'Calle sarratea 123'),
+('Proveedor B', '987654321', 'Avenida santa maria 742');
+
+-- Relacionar productos con proveedores
+INSERT INTO ProductoProveedor (id_producto, id_proveedor) VALUES
+(1, 1),
+(2, 2),
+(3, 1),
+(3, 2);
+
+-- Insertar clientes
+INSERT INTO Cliente (nombre, telefono, direccion) VALUES
+('Cliente 1', '111222333', 'Dirección 1'),
+('Cliente 2', '444555666', 'Dirección 2');
+
+
+
 
