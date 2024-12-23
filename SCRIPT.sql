@@ -1,11 +1,5 @@
-
--- Creación de la base de datos
 CREATE DATABASE IF NOT EXISTS CarniceriaBarbaro;
 USE CarniceriaBarbaro;
-
-
--- TABLAS
-
 
 -- Tabla: Categoria
 CREATE TABLE IF NOT EXISTS Categoria (
@@ -24,143 +18,79 @@ CREATE TABLE IF NOT EXISTS Producto (
     FOREIGN KEY (id_categoria) REFERENCES Categoria(id_categoria) ON DELETE CASCADE
 );
 
--- Tabla: Proveedor
-CREATE TABLE IF NOT EXISTS Proveedor (
-    id_proveedor INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL UNIQUE,
-    telefono VARCHAR(15) NOT NULL,
-    direccion VARCHAR(100) DEFAULT NULL
-);
-
--- Tabla: ProductoProveedor
-CREATE TABLE IF NOT EXISTS ProductoProveedor (
-    id_producto INT NOT NULL,
-    id_proveedor INT NOT NULL,
-    PRIMARY KEY (id_producto, id_proveedor),
-    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto) ON DELETE CASCADE,
-    FOREIGN KEY (id_proveedor) REFERENCES Proveedor(id_proveedor) ON DELETE CASCADE
-);
-
 -- Tabla: Cliente
 CREATE TABLE IF NOT EXISTS Cliente (
     id_cliente INT PRIMARY KEY AUTO_INCREMENT,
-    nombre VARCHAR(50) NOT NULL,
-    telefono VARCHAR(15) DEFAULT NULL,
-    direccion VARCHAR(100) DEFAULT NULL
+    nombre VARCHAR(100) NOT NULL,
+    telefono VARCHAR(20),
+    email VARCHAR(100),
+    direccion TEXT
 );
 
+-- Tabla: Venta
+CREATE TABLE IF NOT EXISTS Venta (
+    id_venta INT PRIMARY KEY AUTO_INCREMENT,
+    fecha DATE NOT NULL,
+    total DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    id_cliente INT,
+    FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente) ON DELETE SET NULL
+);
 
--- VISTAS
+-- Tabla: DetalleVenta
+CREATE TABLE IF NOT EXISTS DetalleVenta (
+    id_detalle INT PRIMARY KEY AUTO_INCREMENT,
+    id_venta INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad INT NOT NULL CHECK (cantidad > 0),
+    subtotal DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (id_venta) REFERENCES Venta(id_venta) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto) ON DELETE CASCADE
+);
 
+-- Tabla: Empleado
+CREATE TABLE IF NOT EXISTS Empleado (
+    id_empleado INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    telefono VARCHAR(20),
+    email VARCHAR(100),
+    direccion TEXT,
+    puesto VARCHAR(50),
+    salario DECIMAL(10, 2) NOT NULL
+);
 
--- Vista: Productos disponibles por categoría
-CREATE OR REPLACE VIEW ProductosPorCategoria AS
-SELECT 
-    c.nombre AS categoria,
-    p.nombre AS producto,
-    p.precio,
-    p.stock
-FROM Producto p
-JOIN Categoria c ON p.id_categoria = c.id_categoria;
+-- Tabla: Proveedor
+CREATE TABLE IF NOT EXISTS Proveedor (
+    id_proveedor INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    telefono VARCHAR(20),
+    email VARCHAR(100),
+    direccion TEXT
+);
 
--- Vista: Relación de productos con proveedores
-CREATE OR REPLACE VIEW ProductosConProveedores AS
-SELECT 
-    p.nombre AS producto,
-    prov.nombre AS proveedor,
-    prov.telefono
-FROM Producto p
-JOIN ProductoProveedor pp ON p.id_producto = pp.id_producto
-JOIN Proveedor prov ON pp.id_proveedor = prov.id_proveedor;
+-- Tabla: Pago
+CREATE TABLE IF NOT EXISTS Pago (
+    id_pago INT PRIMARY KEY AUTO_INCREMENT,
+    id_venta INT NOT NULL,
+    monto DECIMAL(10, 2) NOT NULL CHECK (monto > 0),
+    metodo_pago VARCHAR(50) NOT NULL,
+    fecha_pago DATE NOT NULL,
+    FOREIGN KEY (id_venta) REFERENCES Venta(id_venta) ON DELETE CASCADE
+);
 
+-- Tabla: Inventario
+CREATE TABLE IF NOT EXISTS Inventario (
+    id_inventario INT PRIMARY KEY AUTO_INCREMENT,
+    id_producto INT NOT NULL,
+    cantidad INT NOT NULL CHECK (cantidad >= 0),
+    fecha_actualizacion DATE NOT NULL,
+    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto) ON DELETE CASCADE
+);
 
--- FUNCIONES
-
-
--- Función: Calcular descuento
-DELIMITER $$
-CREATE FUNCTION CalcularDescuento(precio DECIMAL(10, 2), porcentaje DECIMAL(5, 2))
-RETURNS DECIMAL(10, 2)
-DETERMINISTIC
-BEGIN
-    RETURN precio - (precio * porcentaje / 100);
-END $$
-DELIMITER ;
-
-
-
--- PROCEDIMIENTOS
-
-
--- Procedimiento: Insertar un nuevo cliente
-DELIMITER $$
-CREATE PROCEDURE InsertarCliente(
-    IN nombre_cliente VARCHAR(50),
-    IN telefono_cliente VARCHAR(15),
-    IN direccion_cliente VARCHAR(100)
-)
-BEGIN
-    INSERT INTO Cliente (nombre, telefono, direccion)
-    VALUES (nombre_cliente, telefono_cliente, direccion_cliente);
-END $$
-DELIMITER ;
-
--- Procedimiento: Registrar una venta (básico)
-DELIMITER $$
-CREATE PROCEDURE RegistrarVenta(
-    IN id_producto INT,
-    IN cantidad INT
-)
-BEGIN
-    DECLARE stock_actual INT;
-    
-    -- Obtener el stock actual del producto
-    SELECT stock INTO stock_actual FROM Producto WHERE id_producto = id_producto;
-
-    -- Verificar si hay suficiente stock
-    IF stock_actual >= cantidad THEN
-        -- Actualizar el stock
-        UPDATE Producto SET stock = stock - cantidad WHERE id_producto = id_producto;
-    ELSE
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Stock insuficiente para realizar la venta.';
-    END IF;
-END $$
-DELIMITER ;
-
-
--- DATOS DE INSERCIÓN
-
-
--- Insertar categorías
-INSERT INTO Categoria (nombre, descripcion) VALUES 
-('Carnes Rojas', 'Cortes de carne vacuna y de cerdo'),
-('Carnes Blancas', 'Carne de pollo, pescado y similares'),
-('Embutidos', 'Productos como salchichas, chorizos, etc.');
-
--- Insertar productos
-INSERT INTO Producto (nombre, precio, stock, id_categoria) VALUES
-('Bife de Chorizo', 1500.00, 20, 1),
-('Pollo Entero', 800.00, 15, 2),
-('Salchicha Viena', 500.00, 30, 3);
-
--- Insertar proveedores
-INSERT INTO Proveedor (nombre, telefono, direccion) VALUES
-('Proveedor A', '123456789', 'Calle sarratea 123'),
-('Proveedor B', '987654321', 'Avenida santa maria 742');
-
--- Relacionar productos con proveedores
-INSERT INTO ProductoProveedor (id_producto, id_proveedor) VALUES
-(1, 1),
-(2, 2),
-(3, 1),
-(3, 2);
-
--- Insertar clientes
-INSERT INTO Cliente (nombre, telefono, direccion) VALUES
-('Cliente 1', '111222333', 'Dirección 1'),
-('Cliente 2', '444555666', 'Dirección 2');
-
-
-
-
+-- Tabla: Descuento
+CREATE TABLE IF NOT EXISTS Descuento (
+    id_descuento INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(50) NOT NULL,
+    porcentaje DECIMAL(5, 2) NOT NULL CHECK (porcentaje > 0 AND porcentaje <= 100),
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL
+);
